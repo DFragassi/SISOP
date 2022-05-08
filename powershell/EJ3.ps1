@@ -12,6 +12,6 @@ Param(
     [string]$s
 
 )
-foreach($linea in $a){
-    write-host $linea
-}
+# foreach($linea in $a){
+#     write-host $linea
+# }
