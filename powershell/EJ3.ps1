@@ -52,16 +52,17 @@ if(!$s -and $global:flagPub -eq 1){
             #creo el path si no existe    
             New-Item -Path $s -ItemType directory | Out-Null
         }
+
     }
 }
 
 #como obtener el path absoluto a monitorear, además valida que exista o no el path en -c:
-$pathMonitorear = (Resolve-Path -Path "$c").Path;
+$global:pathMonitorear = (Resolve-Path -Path "$c").Path;
 if(!(Test-Path $c)){
     exit 1;
 }
-
-$Path = $pathMonitorear;
+$global:pathSalida = $s;
+$Path = $global:pathMonitorear;
 $FileFilter = '*'  
 $IncludeSubfolders = $true
 $AttributeFilter = [IO.NotifyFilters]::FileName, [IO.NotifyFilters]::LastWrite 
@@ -93,6 +94,12 @@ try
                     $text = "El archivo {0} pesa: {1} KB" -f $Name, ((Get-Item $FullPath).length/1KB)
                     Write-Host $text  -ForegroundColor Yellow
                  }
+                 if($global:flagComp -eq 1){
+                    Get-ChildItem -Path $global:pathMonitorear -Recurse | Get-Content | Out-File -FilePath ./bin/test.txt
+                 }
+                 if($global:flagPub -eq 1){
+                      Copy-Item -Path ./bin/test.txt -Destination $global:pathSalida
+                 }
             }
             'Created'  { 
                 if($global:flagListar -eq 1){
@@ -103,16 +110,28 @@ try
                     $text = "El archivo {0} pesa: {1} KB" -f $Name, ((Get-Item $FullPath).length/1KB)
                     Write-Host $text  -ForegroundColor Yellow
                 }
+                if($global:flagComp -eq 1){
+                    Get-ChildItem -Path $global:pathMonitorear -Recurse | Get-Content | Out-File -FilePath ./bin/test.txt
+                 }
+                 if($global:flagPub -eq 1){
+                      Copy-Item -Path ./bin/test.txt -Destination $global:pathSalida
+                 }
                     }   
             'Deleted'  { 
                  if($global:flagListar -eq 1){
                     $text = "El archivo {0} fue eliminado." -f $Name
                     Write-Host $text -ForegroundColor Yellow
                  }
-                  if($global:flagPeso -eq 1){
+                if($global:flagPeso -eq 1){
                     $text = "El archivo {0} pesa: {1} KB" -f $Name, ((Get-Item $FullPath).length/1KB)
                     Write-Host $text  -ForegroundColor Yellow
-                  }
+                }
+                if($global:flagComp -eq 1){
+                    Get-ChildItem -Path $global:pathMonitorear -Recurse | Get-Content | Out-File -FilePath ./bin/test.txt
+                }
+                if($global:flagPub -eq 1){
+                      Copy-Item -Path ./bin/test.txt -Destination $global:pathSalida
+                 }
 
             }
             'Renamed'  {
@@ -124,6 +143,12 @@ try
                     $text = "El archivo {0} pesa: {1} KB" -f $Name, ((Get-Item $FullPath).length/1KB)
                     Write-Host $text  -ForegroundColor Yellow
                 }
+                 if($global:flagComp -eq 1){
+                    Get-ChildItem -Path $global:pathMonitorear -Recurse | Get-Content | Out-File -FilePath ./bin/test.txt
+                }
+                 if($global:flagPub -eq 1){
+                      Copy-Item -Path ./bin/test.txt -Destination $global:pathSalida
+                 }
             }
             default   { }
             }
