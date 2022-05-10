@@ -1,3 +1,22 @@
+<#
+.SYNOPSIS
+TP2 - Ejercicio 2 - reorganiza archivos por extension que se agreguen a la ruta especificada a monitorizar
+
+.DESCRIPTION
+Cada vez que se agregue un archivo a la ruta especificada por parametro a monitorear,se moveran los archivos al directorio destino especificada por parametro dentro de un subdirectorio que tendra como nombre la extension del archivo o se copiara el archivo en caso de no poseer una extensión
+
+.PARAMETER Descargas
+Indicia el directorio a monitorear
+
+.PARAMETER Destino
+Indicia el directorio que contendra los subdirectorios "extensión".Si no se pasa valor para este parametro, el directorio destino sera el de "Descargas".
+
+.PARAMETER Detener
+Parametro tipo switch.Si esta presente, se debe detener la detección de archivos. No puede pasarse al mismo tiempo que otros parámetros.
+
+#>
+
+[CmdletBinding(DefaultParameterSetName="Start")]
 Param(
     [Parameter(Mandatory=$True)] 
     [string]$c,
@@ -10,9 +29,7 @@ Param(
     # #Op. Backup
     [Parameter(Mandatory=$False)]
     [string]$s
-
 )
-
 $global:flagPub=0;
 $global:flagComp=0;
 $global:flagListar=0;
@@ -61,29 +78,32 @@ $global:pathMonitorear = (Resolve-Path -Path "$c").Path;
 if(!(Test-Path $c)){
     exit 1;
 }
-$global:pathSalida = $s;
-$Path = $global:pathMonitorear;
-$FileFilter = '*'  
-$IncludeSubfolders = $true
-$AttributeFilter = [IO.NotifyFilters]::FileName, [IO.NotifyFilters]::LastWrite 
 
-try
-{
-  $watcher = New-Object -TypeName System.IO.FileSystemWatcher -Property @{
-    Path = $Path
-    Filter = $FileFilter
-    IncludeSubdirectories = $IncludeSubfolders
-    NotifyFilter = $AttributeFilter
-  }
-        $action = {
-            $details = $event.SourceEventArgs
-            $Name = $details.Name
-            $FullPath = $details.FullPath
-            $OldFullPath = $details.OldFullPath
-            $OldName = $details.OldName
-            $ChangeType = $details.ChangeType
+function Start-Watcher() {
+  
+  Get-EventSubscriber -SourceIdentifier  FilesWatcher -ErrorAction SilentlyContinue | Unregister-Event
+   Get-EventSubscriber -SourceIdentifier  Changed -ErrorAction SilentlyContinue | Unregister-Event
+    Get-EventSubscriber -SourceIdentifier  Deleted -ErrorAction SilentlyContinue | Unregister-Event
+     Get-EventSubscriber -SourceIdentifier  Renamed -ErrorAction SilentlyContinue | Unregister-Event
 
-            switch ($ChangeType)
+  $watcher = New-Object IO.FileSystemWatcher
+  $watcher.Path = Resolve-Path -Path $c
+  $watcher.IncludeSubdirectories = $true
+  $watcher.EnableRaisingEvents = $true
+  # # Defino la acción a ejecutar al detectar un cambio
+  $action = {
+      
+    # Información del cambio:
+    $details = $event.SourceEventArgs
+    $FullPath = $details.FullPath
+    $OldFullPath = $details.OldFullPath
+    $Name = $details.Name
+    $OldName = $details.OldName
+      
+    # Tipo de cambio:
+    $ChangeType = $details.ChangeType
+      
+     switch ($ChangeType)
             {
             'Changed'  { 
                  if($global:flagListar -eq 1){
@@ -152,41 +172,36 @@ try
             }
             default   { }
             }
-        }
    
-        $handlers = . {
-            Register-ObjectEvent -InputObject $watcher -EventName Changed  -Action $action 
-            Register-ObjectEvent -InputObject $watcher -EventName Created  -Action $action 
-            Register-ObjectEvent -InputObject $watcher -EventName Deleted  -Action $action 
-            Register-ObjectEvent -InputObject $watcher -EventName Renamed  -Action $action 
-        }
-    
-    
-  # monitoring starts now:
-  $watcher.EnableRaisingEvents = $true
-  Write-Host "Esperando cambios en $Path."
+  }
+  
+  #Me suscribo a los eventos que necesito
 
-  do
-  {
-    Wait-Event -Timeout 1
-  } while ($true)
+  Register-ObjectEvent -InputObject $watcher -EventName Created  -Action $action -SourceIdentifier FilesWatcher
+  Register-ObjectEvent -InputObject $watcher -EventName Changed  -Action $action -SourceIdentifier Changed
+  Register-ObjectEvent -InputObject $watcher -EventName Renamed  -Action $action -SourceIdentifier Renamed
+  Register-ObjectEvent -InputObject $watcher -EventName Deleted  -Action $action -SourceIdentifier Deleted
+
+  Write-Warning "Monitoreando cambios en $global:pathMonitorear"
 }
 
+function Stop-Watcher() {
+  # this gets executed when user presses CTRL+C:
+    
+  Remove-Variable -Name c -Scope global -ErrorAction SilentlyContinue
+  Remove-Variable -Name a -Scope global -ErrorAction SilentlyContinue
+  Remove-Variable -Name s -Scope global -ErrorAction SilentlyContinue
+  exit
+}
+
+try{
+    if ($c) {
+    Start-Watcher
+    }
+}
 finally
 {
-  # this gets executed when user presses CTRL+C:
+  Stop-Watcher
   
-  # stop monitoring
-  $watcher.EnableRaisingEvents = $false
-  
-  # remove the event handlers
-  $handlers | ForEach-Object {
-    Unregister-Event -SourceIdentifier $_.Name
-  }
-
-  $handlers | Remove-Job
-  
-  $watcher.Dispose()
-  
-  Write-Warning "El monitoreo ha terminado."
 }
+
